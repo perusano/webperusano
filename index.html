@@ -105,12 +105,12 @@
     </div>
   </div>
 
-  <!-- Header Limpio (Sin menú de navegación) -->
+  <!-- Header Limpio Responsive -->
   <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-crema-300">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 min-h-[64px] py-2 sm:py-0 flex items-center justify-between gap-2 sm:gap-4">
       <!-- Marca izquierda -->
-      <a href="#inicio" class="flex items-center gap-3 group" aria-label="Perú Sano SRL Inicio">
-        <div class="w-10 h-10 rounded-full overflow-hidden ring-2 ring-verde-600 ring-offset-2 bg-verde-600 shrink-0">
+      <a href="#inicio" class="flex items-center gap-2.5 sm:gap-3 min-w-0 group" aria-label="Perú Sano SRL Inicio">
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-2 ring-verde-600 ring-offset-2 bg-verde-600 shrink-0">
           <img
             src="./assets/logo.jpeg"
             alt="Logo Perú Sano SRL"
@@ -119,40 +119,41 @@
           />
         </div>
         <!-- Fallback visual si falta el archivo -->
-        <div class="hidden w-10 h-10 rounded-full bg-verde-600 text-white flex items-center justify-center shadow-sm shrink-0">
+        <div class="hidden w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-verde-600 text-white flex items-center justify-center shadow-sm shrink-0">
           <span class="font-extrabold text-sm">PS</span>
         </div>
 
-        <div class="leading-tight">
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-base sm:text-lg font-extrabold tracking-tight text-gray-900 group-hover:text-verde-700 transition-colors">
+        <div class="min-w-0 leading-tight">
+          <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <span class="text-sm sm:text-lg font-extrabold tracking-tight text-gray-900 group-hover:text-verde-700 transition-colors whitespace-nowrap">
               Perú Sano SRL
             </span>
-            <span class="inline-block text-[10px] font-extrabold bg-verde-50 text-verde-700 border border-verde-200 px-2 py-0.5 rounded-md">
+            <span class="inline-block text-[9px] sm:text-[10px] font-extrabold bg-verde-50 text-verde-700 border border-verde-200 px-1.5 sm:px-2 py-0.5 rounded-md whitespace-nowrap">
               SENASA N° 006260001
             </span>
           </div>
-          <span class="block text-[10px] font-bold uppercase tracking-wider text-gray-500">
+          <span class="block text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-500 truncate mt-0.5">
             Saneamiento de Flotas &amp; Carga Nacional
           </span>
         </div>
       </a>
 
       <!-- Acciones derecha -->
-      <div class="flex items-center gap-3">
-        <div class="hidden md:inline-flex items-center gap-2 bg-crema-50 border border-crema-300 text-gray-700 text-xs font-bold px-3.5 py-2 rounded-full">
+      <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div class="hidden md:inline-flex items-center gap-2 bg-crema-50 border border-crema-300 text-gray-700 text-xs font-bold px-3.5 py-2 rounded-full whitespace-nowrap">
           <span class="w-2 h-2 rounded-full bg-verde-600 animate-pulse-green" aria-hidden="true"></span>
           <span>Peritos Activos 24/7 en Ruta</span>
         </div>
 
         <a
           href="#solicitud"
-          class="inline-flex items-center gap-2 bg-verde-600 hover:bg-verde-700 text-white text-xs sm:text-sm font-extrabold px-4 py-2.5 rounded-full shadow-md shadow-verde-600/20 transition-all"
+          class="inline-flex items-center gap-1.5 sm:gap-2 bg-verde-600 hover:bg-verde-700 text-white text-[11px] sm:text-sm font-extrabold px-3 sm:px-4 py-2 sm:py-2.5 rounded-full shadow-md shadow-verde-600/20 transition-all whitespace-nowrap"
         >
-          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24" aria-hidden="true">
+          <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
-          <span>Emisión en Línea 24/7</span>
+          <span class="sm:hidden">Solicitar 24/7</span>
+          <span class="hidden sm:inline">Emisión en Línea 24/7</span>
         </a>
       </div>
     </div>
