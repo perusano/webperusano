@@ -1,13 +1,17 @@
 /**
  * Perú Sano SRL - Controlador Modular del Embudo de Conversión (3 Pasos)
- * Toda conexión y solicitud se gestiona directamente vía formulario (FormSubmit AJAX)
+ * Envío directo y rápido hacia Gmail (serviciosanitariosdelperu@gmail.com)
+ * mediante Google Apps Script Web App propio (sin depender de terceros como FormSubmit).
  */
 (function () {
   'use strict';
 
-  const FORMSUBMIT_ENDPOINT =
-    'https://formsubmit.co/ajax/serviciosanitariosdelperu@gmail.com';
+  // Pegar aquí la URL /exec generada al implementar scripts/google-apps-script.gs
+  // desde la cuenta serviciosanitariosdelperu@gmail.com
+  const GOOGLE_SCRIPT_URL =
+    'https://script.google.com/macros/s/AKfycbzd0ihflBl1R7lfx-bLUefJaPRm_uIWtJDRgpmnqOxgyMTArxDCPOm3G2dvSm9IBvjE/exec';
 
+  const REQUEST_TIMEOUT_MS = 12000;
   const DEFAULT_SUBMIT_TEXT = 'Solicitar Desinfección y Certificado Ahora';
   const LOADING_SUBMIT_TEXT = 'Enviando solicitud a central...';
 
@@ -87,6 +91,22 @@
     return `+51 ${digits}`;
   }
 
+  function buildMailtoUrl(data) {
+    const subject = `URGENTE: Solicitud Certificado SENASA - Placa ${data.placa}`;
+    const body = [
+      `Código de Orden: ${data.orderCode}`,
+      `Tipo de Vehículo: ${data.vehicle}`,
+      `Placa del Vehículo: ${data.placa}`,
+      `Celular de Contacto: ${data.telefono}`,
+      `Garita / Ubicación: ${data.ubicacion}`,
+      `Fecha y Hora: ${data.fecha}`
+    ].join('\n');
+
+    return `mailto:serviciosanitariosdelperu@gmail.com?subject=${encodeURIComponent(
+      subject
+    )}&body=${encodeURIComponent(body)}`;
+  }
+
   function showError(message, mailtoHref) {
     if (!dom.formErrorMsg) return;
     dom.formErrorMsg.textContent = '';
@@ -105,22 +125,6 @@
     }
 
     dom.formErrorMsg.classList.remove('hidden');
-  }
-
-  function buildMailtoUrl(data) {
-    const subject = `URGENTE: Solicitud Certificado SENASA - Placa ${data.placa}`;
-    const body = [
-      `Código de Orden: ${data.orderCode}`,
-      `Tipo de Vehículo: ${data.vehicle}`,
-      `Placa del Vehículo: ${data.placa}`,
-      `Celular de Contacto: ${data.telefono}`,
-      `Garita / Ubicación: ${data.ubicacion}`,
-      `Fecha y Hora: ${data.fecha}`
-    ].join('\n');
-
-    return `mailto:serviciosanitariosdelperu@gmail.com?subject=${encodeURIComponent(
-      subject
-    )}&body=${encodeURIComponent(body)}`;
   }
 
   function clearError() {
@@ -201,6 +205,33 @@
     goToStep(2);
   }
 
+  async function postToGoogleScript(payload) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      // text/plain evita el preflight CORS OPTIONS en Google Apps Script y acelera el envío
+      const response = await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8'
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.ok !== true) {
+        throw new Error(
+          result.error || 'No se recibió confirmación del servidor de correo.'
+        );
+      }
+      return result;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
   async function handleFormSubmit(event) {
     event.preventDefault();
     if (state.isSubmitting) return;
@@ -251,9 +282,9 @@
       fecha: fechaSolicitud
     });
 
-    if (window.location.protocol === 'file:') {
+    if (!GOOGLE_SCRIPT_URL) {
       showError(
-        'Estás abriendo la página como archivo local (file://). Para enviar automáticamente a serviciosanitariosdelperu@gmail.com, ábrela desde GitHub Pages (https://) o un servidor local (http://localhost).',
+        'Falta configurar la URL del servicio de correo directo (GOOGLE_SCRIPT_URL en js/funnel.js). Revisa el README.md para activarlo en 2 minutos.',
         mailtoFallback
       );
       return;
@@ -262,53 +293,26 @@
     setSubmitting(true);
 
     try {
-      const formData = new FormData();
-      formData.append(
-        '_subject',
-        `URGENTE: Solicitud Certificado SENASA - Placa ${placa}`
-      );
-      formData.append('_template', 'table');
-      formData.append('_captcha', 'false');
-      formData.append('Código de Orden', orderCode);
-      formData.append('Tipo de Vehículo', state.vehicle);
-      formData.append('Placa del Vehículo', placa);
-      formData.append('Celular de Contacto', formattedPhone);
-      formData.append('Garita / Ubicación', ubicacionFinal);
-      formData.append('Fecha y Hora de Solicitud', fechaSolicitud);
-
-      const response = await fetch(FORMSUBMIT_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json'
-        },
-        body: formData
+      await postToGoogleScript({
+        orderCode,
+        vehicle: state.vehicle,
+        placa,
+        telefono: formattedPhone,
+        ubicacion: ubicacionFinal,
+        timestamp: fechaSolicitud,
+        userAgent: navigator.userAgent
       });
-
-      const result = await response.json().catch(() => ({}));
-      const isSuccess =
-        response.ok && (result.success === true || result.success === 'true');
-
-      if (!isSuccess) {
-        const serverMsg = String(result.message || '');
-        if (serverMsg.toLowerCase().includes('activation')) {
-          throw new Error(
-            'El correo serviciosanitariosdelperu@gmail.com aún requiere activación en FormSubmit. Revisa la bandeja de entrada (o Spam) y haz clic en "Activate Form".'
-          );
-        }
-        throw new Error(
-          serverMsg || 'No se pudo completar el envío al servidor de correo.'
-        );
-      }
 
       renderConfirmationStep();
       goToStep(3);
     } catch (error) {
-      showError(
-        error && error.message
+      const msg =
+        error && error.name === 'AbortError'
+          ? 'La conexión tardó demasiado en responder. Por favor, intente nuevamente o use el enlace directo de correo.'
+          : error && error.message
           ? error.message
-          : 'Ocurrió un inconveniente temporal al enviar su solicitud. Por favor, intente nuevamente.',
-        mailtoFallback
-      );
+          : 'Ocurrió un inconveniente temporal al enviar su solicitud.';
+      showError(msg, mailtoFallback);
     } finally {
       setSubmitting(false);
     }
@@ -386,9 +390,229 @@
     goToStep(1);
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
+  // =========================================================================
+  // Segundo Embudo: Contacto Control de Plagas (PerusanoApp)
+  // =========================================================================
+  function initPlagasFunnel() {
+    const pDom = {
+      progressBar: document.getElementById('plagas-progress-bar'),
+      stepLabel: document.getElementById('plagas-step-label'),
+      step1: document.getElementById('plagas-step-1'),
+      step2: document.getElementById('plagas-step-2'),
+      step3: document.getElementById('plagas-step-3'),
+      cards: document.querySelectorAll('.plagas-card'),
+      selectedBadge: document.getElementById('plagas-selected-badge'),
+      btnBack: document.getElementById('plagas-btn-back'),
+      form: document.getElementById('plagas-form'),
+      inputNombre: document.getElementById('plagas-input-nombre'),
+      inputTelefono: document.getElementById('plagas-input-telefono'),
+      inputUbicacion: document.getElementById('plagas-input-ubicacion'),
+      errorMsg: document.getElementById('plagas-error-msg'),
+      btnSubmit: document.getElementById('plagas-btn-submit'),
+      summaryOrder: document.getElementById('plagas-summary-order'),
+      summaryService: document.getElementById('plagas-summary-service'),
+      summaryNombre: document.getElementById('plagas-summary-nombre'),
+      summaryTelefono: document.getElementById('plagas-summary-telefono'),
+      summaryUbicacion: document.getElementById('plagas-summary-ubicacion'),
+      btnReset: document.getElementById('plagas-btn-reset')
+    };
+
+    if (!pDom.step1 || !pDom.step2 || !pDom.step3) return;
+
+    const pState = {
+      service: '',
+      isSubmitting: false
+    };
+
+    const labels = {
+      1: 'PASO 1 DE 3 • ELIGE TU PLAN DE SUSCRIPCIÓN',
+      2: 'PASO 2 DE 3 • DATOS DE CONTACTO',
+      3: 'PASO 3 DE 3 • SOLICITUD ENVIADA'
+    };
+
+    function showPlagasError(msg, mailtoHref) {
+      if (!pDom.errorMsg) return;
+      pDom.errorMsg.textContent = '';
+      const p = document.createElement('p');
+      p.textContent = msg;
+      pDom.errorMsg.appendChild(p);
+      if (mailtoHref) {
+        const link = document.createElement('a');
+        link.href = mailtoHref;
+        link.className =
+          'inline-block mt-2 underline font-extrabold text-rojo-700 hover:text-rojo-800';
+        link.textContent =
+          'Enviar solicitud directamente por su aplicación de correo →';
+        pDom.errorMsg.appendChild(link);
+      }
+      pDom.errorMsg.classList.remove('hidden');
+    }
+
+    function clearPlagasError() {
+      if (!pDom.errorMsg) return;
+      pDom.errorMsg.textContent = '';
+      pDom.errorMsg.classList.add('hidden');
+    }
+
+    function setPlagasSubmitting(isLoading) {
+      pState.isSubmitting = isLoading;
+      if (!pDom.btnSubmit) return;
+      pDom.btnSubmit.disabled = isLoading;
+      if (isLoading) {
+        pDom.btnSubmit.classList.add('opacity-80', 'cursor-wait');
+        pDom.btnSubmit.innerHTML = `<span>${LOADING_SUBMIT_TEXT}</span>`;
+      } else {
+        pDom.btnSubmit.classList.remove('opacity-80', 'cursor-wait');
+        pDom.btnSubmit.innerHTML = `
+          <span>Solicitar Suscripción PerusanoApp</span>
+          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+        `;
+      }
+    }
+
+    function goPlagasStep(stepNumber) {
+      [pDom.step1, pDom.step2, pDom.step3].forEach((el, idx) => {
+        if (!el) return;
+        if (idx + 1 === stepNumber) {
+          el.classList.remove('hidden', 'funnel-step-enter');
+          void el.offsetWidth;
+          el.classList.add('funnel-step-enter');
+        } else {
+          el.classList.add('hidden');
+        }
+      });
+
+      if (pDom.progressBar) {
+        const widths = { 1: '33.33%', 2: '66.66%', 3: '100%' };
+        pDom.progressBar.style.width = widths[stepNumber] || '33.33%';
+      }
+      if (pDom.stepLabel) {
+        pDom.stepLabel.textContent = labels[stepNumber] || labels[1];
+      }
+      if (stepNumber === 2 && pDom.inputNombre) {
+        setTimeout(() => pDom.inputNombre.focus(), 120);
+      }
+    }
+
+    pDom.cards.forEach((card) => {
+      card.addEventListener('click', () => {
+        const service = card.getAttribute('data-plagas-service');
+        if (!service) return;
+        pState.service = service;
+        pDom.cards.forEach((c) => c.classList.remove('is-selected'));
+        card.classList.add('is-selected');
+        if (pDom.selectedBadge) pDom.selectedBadge.textContent = service;
+        clearPlagasError();
+        goPlagasStep(2);
+      });
+    });
+
+    if (pDom.btnBack) {
+      pDom.btnBack.addEventListener('click', () => {
+        clearPlagasError();
+        goPlagasStep(1);
+      });
+    }
+
+    if (pDom.inputTelefono) {
+      pDom.inputTelefono.addEventListener('input', (e) => {
+        e.target.value = normalizeTelefono(e.target.value);
+      });
+    }
+
+    if (pDom.form) {
+      pDom.form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (pState.isSubmitting) return;
+        clearPlagasError();
+
+        const nombre = pDom.inputNombre ? pDom.inputNombre.value.trim() : '';
+        const rawPhone = pDom.inputTelefono ? pDom.inputTelefono.value.trim() : '';
+        const ubicacion =
+          (pDom.inputUbicacion ? pDom.inputUbicacion.value.trim() : '') ||
+          'Por confirmar';
+
+        if (!pState.service) {
+          goPlagasStep(1);
+          return;
+        }
+        if (nombre.length < 2) {
+          showPlagasError('Ingrese su nombre o razón social.');
+          if (pDom.inputNombre) pDom.inputNombre.focus();
+          return;
+        }
+        if (rawPhone.replace(/\D/g, '').length < 9) {
+          showPlagasError('Ingrese un número celular de contacto válido de 9 dígitos.');
+          if (pDom.inputTelefono) pDom.inputTelefono.focus();
+          return;
+        }
+
+        const orderCode = `PP-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+        const formattedPhone = formatPhoneDisplay(rawPhone);
+        const timestamp = formatPeruTimestamp();
+        const mailtoFallback = buildMailtoUrl({
+          orderCode,
+          vehicle: `Control de Plagas (${pState.service})`,
+          placa: nombre,
+          telefono: formattedPhone,
+          ubicacion,
+          fecha: timestamp
+        });
+
+        setPlagasSubmitting(true);
+        try {
+          await postToGoogleScript({
+            orderCode,
+            vehicle: `Control de Plagas (${pState.service})`,
+            placa: nombre,
+            telefono: formattedPhone,
+            ubicacion,
+            timestamp,
+            userAgent: navigator.userAgent
+          });
+
+          if (pDom.summaryOrder) pDom.summaryOrder.textContent = orderCode;
+          if (pDom.summaryService) pDom.summaryService.textContent = pState.service;
+          if (pDom.summaryNombre) pDom.summaryNombre.textContent = nombre;
+          if (pDom.summaryTelefono) pDom.summaryTelefono.textContent = formattedPhone;
+          if (pDom.summaryUbicacion) pDom.summaryUbicacion.textContent = ubicacion;
+          goPlagasStep(3);
+        } catch (err) {
+          showPlagasError(
+            err && err.message
+              ? err.message
+              : 'Ocurrió un inconveniente temporal al enviar su solicitud.',
+            mailtoFallback
+          );
+        } finally {
+          setPlagasSubmitting(false);
+        }
+      });
+    }
+
+    if (pDom.btnReset) {
+      pDom.btnReset.addEventListener('click', () => {
+        pState.service = '';
+        pDom.cards.forEach((c) => c.classList.remove('is-selected'));
+        if (pDom.form) pDom.form.reset();
+        clearPlagasError();
+        goPlagasStep(1);
+      });
+    }
+
+    goPlagasStep(1);
+  }
+
+  function initAll() {
     init();
+    initPlagasFunnel();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAll);
+  } else {
+    initAll();
   }
 })();

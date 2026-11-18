@@ -5,36 +5,49 @@ Landing page estática de alta conversión para **EMPRESA PRESTADORA DE SERVICIO
 ## Estructura del Proyecto
 
 ```text
-├── CNAME                 # Dominio personalizado para GitHub Pages (www.perusanoapp.com)
-├── index.html            # Estructura principal, paleta (crema/verde/rojo), Schema.org y embudo de 3 pasos
+├── CNAME                          # Dominio personalizado para GitHub Pages (www.perusanoapp.com)
+├── index.html                     # Estructura principal, paleta (crema/verde/rojo), Schema.org y embudo de 3 pasos
 ├── css/
-│   └── styles.css        # Animaciones (@keyframes pulse-green, pulse-red) y estilos base modulares
+│   └── styles.css                 # Animaciones (@keyframes pulse-green, pulse-red) y estilos base modulares
 ├── js/
-│   └── funnel.js         # Controlador del embudo de 3 pasos y envío AJAX vía FormSubmit
+│   └── funnel.js                  # Controlador del embudo de 3 pasos y envío directo vía Google Apps Script
+├── scripts/
+│   └── google-apps-script.gs      # Receptor directo en Gmail (serviciosanitariosdelperu@gmail.com) con plantilla HTML
 ├── assets/
+│   ├── senasa.png                 # Logo oficial SENASA
 │   └── img/
 │       └── hero-desinfeccion.jpg  # Fotografía operativa principal
-└── README.md             # Guía de activación de correo y configuración DNS
+└── README.md                      # Guía de activación de correo directo y configuración DNS
 ```
 
 ---
 
-## 1. Activación del Correo (FormSubmit — Sin Backend)
+## 1. Activación del Envío Directo desde Gmail (Sin FormSubmit)
 
-Toda conexión y solicitud se realiza a través del formulario web, enviando los datos por AJAX directamente a:
-`https://formsubmit.co/ajax/serviciosanitariosdelperu@gmail.com`
+Para que las solicitudes lleguen al instante (1–2 segundos) con formato HTML corporativo directamente desde **`serviciosanitariosdelperu@gmail.com`** y sin depender de servicios externos lentos:
 
-**Pasos de activación única:**
-1. Despliegue el sitio en GitHub Pages (o ábralo desde un servidor HTTP/HTTPS).
-2. Envíe una solicitud de prueba desde el embudo de 3 pasos.
-3. Revise la bandeja de entrada (y carpeta de Spam) de **`serviciosanitariosdelperu@gmail.com`**.
-4. Abra el correo de **FormSubmit** y haga clic en **"Activate Form"**.
-5. A partir de ese momento, todas las solicitudes llegarán automáticamente con el asunto:
-   `URGENTE: Solicitud Certificado SENASA - Placa [PLACA]`.
+1. Inicia sesión en Google con la cuenta **`serviciosanitariosdelperu@gmail.com`**.
+2. Entra a [https://script.google.com](https://script.google.com) y haz clic en **Nuevo proyecto**.
+3. Borra el contenido por defecto y pega todo el código de [`scripts/google-apps-script.gs`](scripts/google-apps-script.gs).
+4. Guarda el proyecto (Ctrl + S) con el nombre `PeruSano-Receptor`.
+5. Haz clic en **Implementar → Nueva implementación**:
+   - **Tipo:** `Aplicación web`
+   - **Ejecutar como:** `Yo (serviciosanitariosdelperu@gmail.com)`
+   - **Quién tiene acceso:** `Cualquier usuario`
+6. Autoriza los permisos de correo cuando Google lo solicite y copia la **URL de la aplicación web** (termina en `/exec`).
+7. Pega esa URL en la constante `GOOGLE_SCRIPT_URL` al inicio de [`js/funnel.js`](js/funnel.js).
 
-> **Nota sobre Imágenes:**
-> - La fotografía operativa ya está guardada en `assets/img/hero-desinfeccion.jpg`.
-> - Si deseas usar un logotipo propio en imagen, colócalo en `assets/img/logo-perusano.webp` (mientras no exista, se muestra el emblema vectorial de Perú Sano SRL).
+> **Ventajas frente a FormSubmit:**
+> - Envío directo desde los servidores de Google (~1 segundo).
+> - Funciona incluso si pruebas el sitio en local o desde GitHub Pages sin preflight CORS.
+> - Plantilla HTML profesional con código de orden (`PS-2026-XXXX`), codificación UTF-8 limpia y trazabilidad completa.
+
+### Organizar solicitudes en una carpeta (Etiqueta) en Gmail
+Para que cada solicitud entre automáticamente a una carpeta dedicada (ej. `Solicitudes SENASA`):
+1. En Gmail (`serviciosanitariosdelperu@gmail.com`), abre **Configuración (⚙️) → Ver toda la configuración → Filtros y direcciones bloqueadas → Crear un filtro**.
+2. En el campo **Asunto**, escribe: `Solicitud Certificado SENASA` y pulsa **Crear filtro**.
+3. Marca **Aplicar la etiqueta** → selecciona o crea `Solicitudes SENASA` y marca **No marcar nunca como spam** (opcional: **Omitir Recibidos** si deseas que vaya solo a esa carpeta).
+4. Pulsa **Crear filtro**.
 
 ---
 
@@ -43,8 +56,6 @@ Toda conexión y solicitud se realiza a través del formulario web, enviando los
 En el panel DNS de su proveedor de dominio (`perusanoapp.com`), configure los siguientes registros:
 
 ### Registros `A` (para el dominio raíz `perusanoapp.com` / `@`)
-Apunte el host `@` a las 4 direcciones IP oficiales de GitHub Pages:
-
 | Tipo | Host | Valor / Apunta a | TTL |
 | :--- | :--- | :--- | :--- |
 | `A` | `@` | `185.199.108.153` | Automático / 3600 |
@@ -60,5 +71,5 @@ Apunte el host `@` a las 4 direcciones IP oficiales de GitHub Pages:
 ### Activación en GitHub
 1. Suba el repositorio a GitHub y vaya a **Settings → Pages**.
 2. En **Build and deployment**, seleccione la rama principal (`main`) y carpeta `/ (root)`.
-3. En **Custom domain**, verifique que aparezca `www.perusanoapp.com` (leído automáticamente desde el archivo `CNAME`).
-4. Una vez propagado el DNS, marque la casilla **Enforce HTTPS**.
+3. En **Custom domain**, verifique que aparezca `www.perusanoapp.com` (leído automáticamente desde `CNAME`).
+4. Una vez propagado el DNS, marque **Enforce HTTPS**.
